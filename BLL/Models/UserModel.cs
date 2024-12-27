@@ -8,7 +8,7 @@ namespace BLL.Models
         public User Record { get; set; }
         public string RoleName { get; set; }
 
-        // Add display and validation attributes for the view
+  
         [Required(ErrorMessage = "Username is required")]
         [Display(Name = "Username")]
         public string UserName
@@ -31,7 +31,6 @@ namespace BLL.Models
             set { if (Record != null) Record.IsActive = value; }
         }
 
-        // Only used for create/update operations
         [Display(Name = "Password")]
         [DataType(DataType.Password)]
         public string Password { get; set; }

@@ -1,5 +1,6 @@
 using BLL.DAL;
 using BLL.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,22 @@ builder.Services.AddDbContext<Db>(options =>
 
 builder.Services.AddScoped<IRolesService, RolesService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthorService, AuthorService>();
+builder.Services.AddScoped<IBookService, BookService>();
+builder.Services.AddScoped<IGenreService, GenreService>();
+
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Users/Login";
+        options.LogoutPath = "/Users/Logout";
+        options.AccessDeniedPath = "/Home/AccessDenied";
+        options.Cookie.Name = "BookStoreAuth";
+        options.ExpireTimeSpan = TimeSpan.FromHours(24);
+        options.SlidingExpiration = true;
+    });
+
 
 var app = builder.Build();
 
@@ -39,8 +56,10 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// Add authentication before authorization if you plan to use it
-// app.UseAuthentication();
+
+
+// In the middleware section, make sure you have:
+app.UseAuthentication(); // Add before UseAuthorization()
 app.UseAuthorization();
 
 app.MapControllerRoute(

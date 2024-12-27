@@ -3,8 +3,6 @@ using BLL.Models;
 using BLL.Services.Bases;
 using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BLL.Services
 {
@@ -23,17 +21,15 @@ namespace BLL.Services
             _db = db;
         }
 
-        private string HashPassword(string password)
-        {
-            using (var sha256 = SHA256.Create())
-            {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                return Convert.ToBase64String(hashedBytes);
-            }
-        }
-
         public IQueryable<UserModel> Query()
         {
+            // Debug: Print all users in the database
+            var allUsers = _db.Users.ToList();
+            foreach (var user in allUsers)
+            {
+                Console.WriteLine($"Found user in DB: ID={user.Id}, Username={user.UserName}, Password={user.Password}, RoleId={user.RoleId}, IsActive={user.IsActive}");
+            }
+
             return _db.Users
                 .OrderBy(u => u.UserName)
                 .Select(u => new UserModel
@@ -51,7 +47,6 @@ namespace BLL.Services
                     return Error("User with this username already exists!");
 
                 record.UserName = record.UserName.Trim();
-                record.Password = HashPassword(record.Password);
                 record.IsActive = true;  // Set default value
 
                 _db.Users.Add(record);
@@ -84,7 +79,7 @@ namespace BLL.Services
                 // Only update password if a new one is provided
                 if (!string.IsNullOrWhiteSpace(record.Password))
                 {
-                    user.Password = HashPassword(record.Password);
+                    user.Password = record.Password;
                 }
 
                 _db.Users.Update(user);
@@ -106,7 +101,6 @@ namespace BLL.Services
                 if (user == null)
                     return Error("User not found!");
 
-                // Instead of hard delete, you might want to just deactivate the user
                 user.IsActive = false;
                 _db.Users.Update(user);
                 _db.SaveChanges();
@@ -123,21 +117,36 @@ namespace BLL.Services
         {
             try
             {
-                var hashedPassword = HashPassword(password);
-                var user = _db.Users
-                    .FirstOrDefault(u => u.UserName.ToUpper() == userName.ToUpper().Trim()
-                        && u.Password == hashedPassword);
+                Console.WriteLine($"Login attempt - Raw input: Username='{userName}', Password='{password}'");
 
-                if (user == null)
-                    return Error("Invalid username or password!");
+                // Use case-insensitive comparison
+                var user = _db.Users.FirstOrDefault(u =>
+                    u.UserName.ToUpper() == userName.ToUpper().Trim());
 
-                if (!user.IsActive)
-                    return Error("This account has been deactivated!");
+                if (user != null)
+                {
+                    Console.WriteLine($"Found user: ID={user.Id}, Username='{user.UserName}', StoredPassword='{user.Password}'");
 
-                return Success("Login successful.");
+                    if (user.Password == password)
+                    {
+                        if (!user.IsActive)
+                        {
+                            return Error("This account has been deactivated!");
+                        }
+                        return Success("Login successful.");
+                    }
+                    Console.WriteLine("Password mismatch");
+                }
+                else
+                {
+                    Console.WriteLine("Username not found");
+                }
+
+                return Error("Invalid username or password!");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Login error: {ex}");
                 return Error($"Login failed! Error: {ex.Message}");
             }
         }
@@ -150,11 +159,10 @@ namespace BLL.Services
                 if (user == null)
                     return Error("User not found!");
 
-                var hashedOldPassword = HashPassword(oldPassword);
-                if (user.Password != hashedOldPassword)
+                if (user.Password != oldPassword)
                     return Error("Current password is incorrect!");
 
-                user.Password = HashPassword(newPassword);
+                user.Password = newPassword;
                 _db.Users.Update(user);
                 _db.SaveChanges();
 
